@@ -1,34 +1,33 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-module Graphics.Pixelflut (
-  withConnection,
-  Pixelflut,
-  Color(..), rgb,
-  px,
-  black, white, red, green, blue, cyan, yellow, magenta
-)
+module Graphics.Pixelflut
+       ( withConnection
+       , Pixelflut
+       , Color(..), rgb
+       , black, white, red, green, blue, cyan, yellow, magenta
+       , px )
   where
 
+import Control.Applicative ((<$>), Applicative)
+import Control.Monad.State
+import Control.Monad.Reader (ReaderT(..), MonadReader, ask)
+import Data.Functor ()
+import Data.Monoid (Monoid, mempty, mappend, (<>))
 import Data.Word (Word8)
-import qualified Data.ByteString.Char8 as Char8
 import Network.Socket  ( HostName, ServiceName, Socket
                        , getAddrInfo, AddrInfo(..), defaultHints
                        , socket, connect )
 import Network.Socket.ByteString (sendAll)
-import Data.Functor ()
-import Control.Applicative ((<$>), Applicative)
-import Control.Monad.State
-import Data.Monoid (Monoid, mempty, mappend, (<>))
-import Control.Monad.Reader (ReaderT(..), MonadReader, ask)
 import Text.Printf (printf)
+import qualified Data.ByteString.Char8 as Char8
 
 
 --------------------------------------------------------------------------------
 newtype Pixelflut a = Pixelflut { runPixelflut :: ReaderT Socket IO a }
-                      deriving (Functor, Applicative, Monad
+                      deriving ( Functor, Applicative, Monad
                                , MonadIO, MonadReader Socket)
                       
-
+--------------------------------------------------------------------------------
 data Color = RGBA Word8 Word8 Word8 Word8
 rgb :: Word8 -> Word8 -> Word8 -> Color
 rgb r g b = RGBA r g b 0
@@ -66,7 +65,7 @@ withConnection host service pf = startConnection host service
 
 --------------------------------------------------------------------------------
 px :: Int -> Int -> Color -> Pixelflut ()
-px x y (RGBA r g b a) = do
+px x y (RGBA r g b _) = do
   s <- ask
   liftIO $ sendAll s $ Char8.pack $ str
   liftIO $ print $ "Sent! " ++ str
