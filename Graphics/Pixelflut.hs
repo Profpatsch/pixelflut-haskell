@@ -47,7 +47,7 @@ instance Monoid Color where
   mempty = RGBA 0 0 0 0
   mappend (RGBA r g b a) (RGBA r' g' b' a') =
     (RGBA (r +++ r') (g +++ g') (b +++ b') (a +++ a'))
-      where x +++ y = max 255 (x + y)
+      where x +++ y = min 255 (x + y)
 
 instance Show Color where
   show (RGBA r g b a) = printf "%.2x%.2x%.2x%.2x" r g b a
