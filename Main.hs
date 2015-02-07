@@ -3,7 +3,7 @@ module Main where
 
 import Graphics.Pixelflut
 
-run = withConnection "nyx" "1234"
+run = withConnection "172.16.0.163" "1234"
 
 main :: IO ()
 main = run $ do

@@ -5,7 +5,7 @@ module Graphics.Pixelflut
        , Pixelflut
        , Color(..), rgb
        , black, white, red, green, blue, cyan, yellow, magenta
-       , px, size )
+       , px, size, help, quit, text )
   where
 
 import Control.Applicative ((<$>), Applicative)
@@ -13,7 +13,7 @@ import Control.Monad.State
 import Control.Monad.Reader (ReaderT(..), MonadReader, ask)
 import Data.Functor ()
 import Data.Monoid (Monoid, mempty, mappend, (<>))
-import Data.List (stripPrefix, dropWhileEnd, takeWhile)
+import Data.List (stripPrefix, dropWhileEnd)
 import Data.Word (Word8)
 import Network.Socket  ( HostName, ServiceName, Socket
                        , getAddrInfo, AddrInfo(..), defaultHints
@@ -79,16 +79,26 @@ recvStr = do
   -- 256 bytes should be enough (ugh).
   liftIO $ (recv s 256 >>= return . Char8.unpack)
   
+--------------------------------------------------------------------------------
 px :: Int -> Int -> Color -> Pixelflut ()
 px x y (RGBA r g b _) = sendStr $ printf "PX %d %d %.2x%.2x%.2x\n" x y r g b
 
 size :: Pixelflut (Maybe (Int, Int))
 size = sendStr "SIZE\n" >> recvStr >>= return . parseSize
+  where
+    parseSize :: String -> Maybe (Int, Int)
+    parseSize l = do
+      l' <- stripPrefix "SIZE " $ dropWhileEnd (=='\n') l
+      (x, y) <- return $ break (==' ') l'
+      x' <- readMaybe x
+      y' <- readMaybe y
+      return (x', y')
 
-parseSize :: String -> Maybe (Int, Int)
-parseSize l = do
-  l' <- stripPrefix "SIZE " $ dropWhileEnd (=='\n') l
-  (x, y) <- return $ break (==' ') l'
-  x' <- readMaybe x
-  y' <- readMaybe y
-  return (x', y')
+help :: Pixelflut String
+help = sendStr "HELP\n" >> recvStr >>= return
+
+quit :: Pixelflut ()
+quit = sendStr "QUIT\n"
+
+text :: Int -> Int -> String -> Pixelflut ()
+text x y t = sendStr $ printf "TEXT %d %d %s" x y t
