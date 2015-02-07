@@ -5,7 +5,7 @@ module Graphics.Pixelflut
        , Pixelflut
        , Color(..), rgb
        , black, white, red, green, blue, cyan, yellow, magenta
-       , px )
+       , px, size )
   where
 
 import Control.Applicative ((<$>), Applicative)
@@ -13,12 +13,14 @@ import Control.Monad.State
 import Control.Monad.Reader (ReaderT(..), MonadReader, ask)
 import Data.Functor ()
 import Data.Monoid (Monoid, mempty, mappend, (<>))
+import Data.List (stripPrefix, dropWhileEnd, takeWhile)
 import Data.Word (Word8)
 import Network.Socket  ( HostName, ServiceName, Socket
                        , getAddrInfo, AddrInfo(..), defaultHints
-                       , socket, connect )
-import Network.Socket.ByteString (sendAll)
+                       , socket, connect, close )
+import Network.Socket.ByteString (sendAll, recv)
 import Text.Printf (printf)
+import Text.Read (readMaybe)
 import qualified Data.ByteString.Char8 as Char8
 
 
@@ -54,19 +56,39 @@ instance Show Color where
 startConnection :: HostName -> ServiceName -> IO Socket
 startConnection host service = do
   i <- head <$> getAddrInfo (Just defaultHints) (Just host) (Just service)
-  s <-  socket (addrFamily i) (addrSocketType i) (addrProtocol i)
+  s <- socket (addrFamily i) (addrSocketType i) (addrProtocol i)
   connect s $ addrAddress i
-  print "Connected!"
+  -- print "Connected!"
   return s
 
 withConnection :: HostName -> ServiceName -> Pixelflut () -> IO ()
-withConnection host service pf = startConnection host service
-                                 >>= (runReaderT.runPixelflut) pf 
+withConnection host service pf = do
+  s <- startConnection host service
+  (runReaderT.runPixelflut) pf s
+  close s
 
 --------------------------------------------------------------------------------
-px :: Int -> Int -> Color -> Pixelflut ()
-px x y (RGBA r g b _) = do
+sendStr :: String -> Pixelflut ()
+sendStr str = do
   s <- ask
-  liftIO $ sendAll s $ Char8.pack $ str
-  liftIO $ print $ "Sent! " ++ str
-    where str = printf "PX %d %d %.2x%.2x%.2x\n" x y r g b
+  liftIO . sendAll s $ Char8.pack str
+
+recvStr :: Pixelflut String
+recvStr = do
+  s <- ask
+  -- 256 bytes should be enough (ugh).
+  liftIO $ (recv s 256 >>= return . Char8.unpack)
+  
+px :: Int -> Int -> Color -> Pixelflut ()
+px x y (RGBA r g b _) = sendStr $ printf "PX %d %d %.2x%.2x%.2x\n" x y r g b
+
+size :: Pixelflut (Maybe (Int, Int))
+size = sendStr "SIZE\n" >> recvStr >>= return . parseSize
+
+parseSize :: String -> Maybe (Int, Int)
+parseSize l = do
+  l' <- stripPrefix "SIZE " $ dropWhileEnd (=='\n') l
+  (x, y) <- return $ break (==' ') l'
+  x' <- readMaybe x
+  y' <- readMaybe y
+  return (x', y')

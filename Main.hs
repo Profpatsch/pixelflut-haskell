@@ -1,9 +1,12 @@
 module Main where
 
+
 import Graphics.Pixelflut
 
+run = withConnection "nyx" "1234"
+
 main :: IO ()
-main = withConnection "nyx" "1234" $ do
+main = run $ do
   px 100 100 red
   px 100 102 green
   px 100 104 blue
