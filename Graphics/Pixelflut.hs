@@ -3,6 +3,7 @@
 module Graphics.Pixelflut
        ( withConnection
        , Pixelflut
+       , SocketType(..)
        , Color(..), rgb
        , black, white, red, green, blue, cyan, yellow, magenta
        , px, size, help, quit, text )
@@ -12,6 +13,7 @@ import Control.Applicative ((<$>), Applicative)
 import Control.Monad.State
 import Control.Monad.Reader (ReaderT(..), MonadReader, ask)
 import Data.Functor ()
+import Data.Semigroup (Semigroup)
 import Data.Monoid (Monoid, mempty, mappend, (<>))
 import Data.List (stripPrefix, dropWhileEnd)
 import Data.Word (Word8)
@@ -28,12 +30,14 @@ import qualified Data.ByteString.Char8 as Char8
 newtype Pixelflut a = Pixelflut { runPixelflut :: ReaderT Socket IO a }
                       deriving ( Functor, Applicative, Monad
                                , MonadIO, MonadReader Socket)
-                      
+
+data SocketType = TCP | UDP
 --------------------------------------------------------------------------------
-data Color = RGBA Word8 Word8 Word8 Word8
+data Color = RGBA Word8 Word8 Word8 Word8 deriving (Eq)
 rgb :: Word8 -> Word8 -> Word8 -> Color
 rgb r g b = RGBA r g b 0
 
+black, red, green, blue, white, yellow, cyan, magenta :: Color
 black = rgb 0 0 0
 red = rgb 255 0 0
 green = rgb 0 255 0
@@ -41,13 +45,15 @@ blue = rgb 0 0 255
 white = red <> green <> blue
 yellow = red <> green
 cyan = green <> blue
-magenta = red <> blue  
+magenta = red <> blue
+
+instance Semigroup Color where
+  (<>) (RGBA r g b a) (RGBA r' g' b' a') =
+    (RGBA (r +++ r') (g +++ g') (b +++ b') (a +++ a'))
+      where x +++ y = min 255 (x + y)
 
 instance Monoid Color where
   mempty = RGBA 0 0 0 0
-  mappend (RGBA r g b a) (RGBA r' g' b' a') =
-    (RGBA (r +++ r') (g +++ g') (b +++ b') (a +++ a'))
-      where x +++ y = min 255 (x + y)
 
 instance Show Color where
   show (RGBA r g b a) = printf "%.2x%.2x%.2x%.2x" r g b a
@@ -78,7 +84,7 @@ recvStr = do
   s <- ask
   -- 256 bytes should be enough (ugh).
   liftIO $ (recv s 256 >>= return . Char8.unpack)
-  
+
 --------------------------------------------------------------------------------
 px :: Int -> Int -> Color -> Pixelflut ()
 px x y (RGBA r g b _) = sendStr $ printf "PX %d %d %.2x%.2x%.2x\n" x y r g b
